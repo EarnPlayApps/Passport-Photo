@@ -7,7 +7,7 @@ Malaysia-focused passport and document photo preparation app.
 - Passport Malaysia is the primary use case
 - Requirement-specific photo preparation and compliance checking
 - Local-first photo processing
-- Free: AdMaven (publisher placement held until a real app-compatible placement is supplied)
+- Monetization is currently disabled while the core photo system is completed
 - Pro: RM19.90 Lifetime via manual TNG activation
 - No Google Play Billing
 - No automatic photo upload
