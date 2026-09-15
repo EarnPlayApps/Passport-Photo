@@ -3,12 +3,14 @@ package com.earnplayapps.passportphoto;
 import android.app.Activity;
 import android.content.*;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.Manifest;
 
 public class CameraActivity extends Activity {
     static final int CAM = 10, PERM = 11;
+    private Uri outputUri;
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
@@ -17,11 +19,22 @@ public class CameraActivity extends Activity {
         } else open();
     }
 
-    void open() {
+    private void open() {
         try {
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.Images.Media.DISPLAY_NAME, "PassportPhoto_Camera_" + System.currentTimeMillis() + ".jpg");
+            v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            if (android.os.Build.VERSION.SDK_INT >= 29) v.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Passport Photo");
+            outputUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            if (outputUri == null) throw new IllegalStateException("Camera output unavailable");
+
             Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            i.putExtra(MediaStore.EXTRA_OUTPUT, outputUri);
+            i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivityForResult(i, CAM);
         } catch (Exception e) {
+            if (outputUri != null) getContentResolver().delete(outputUri, null, null);
+            outputUri = null;
             setResult(RESULT_CANCELED);
             finish();
         }
@@ -35,14 +48,13 @@ public class CameraActivity extends Activity {
 
     @Override protected void onActivityResult(int r, int c, Intent d) {
         super.onActivityResult(r, c, d);
-        if (r == CAM && c == RESULT_OK && d != null && d.getExtras() != null) {
-            Object data = d.getExtras().get("data");
-            if (data instanceof android.graphics.Bitmap) {
-                android.graphics.Bitmap bitmap = (android.graphics.Bitmap) data;
-                Intent i = new Intent(this, PhotoEditorActivity.class);
-                PhotoEditorActivity.setPendingCameraBitmap(bitmap);
-                startActivity(i);
-            }
+        if (r == CAM && c == RESULT_OK && outputUri != null) {
+            Intent i = new Intent(this, PhotoEditorActivity.class);
+            i.setData(outputUri);
+            startActivity(i);
+            setResult(RESULT_OK);
+        } else if (outputUri != null) {
+            getContentResolver().delete(outputUri, null, null);
         }
         finish();
     }
