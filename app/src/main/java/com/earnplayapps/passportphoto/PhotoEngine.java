@@ -14,7 +14,14 @@ public final class PhotoEngine {
         int nw=w, nh=Math.round(w/ratio); if(nh>h){nh=h; nw=Math.round(h*ratio);} int l=(w-nw)/2, t=(h-nh)/2;
         return Bitmap.createBitmap(src,l,t,nw,nh);
     }
+    /** Converts a physical print size to pixels using the app's 300 DPI output assumption. */
+    public static int mmToPx(int mm){return Math.max(1,Math.round(mm*300f/25.4f));}
     public static Bitmap resizeForPrint(Bitmap src, int widthPx, int heightPx) { return Bitmap.createScaledBitmap(src,Math.max(1,widthPx),Math.max(1,heightPx),true); }
+    public static Bitmap resizeForPrintMm(Bitmap src, int widthMm, int heightMm) {
+        if(widthMm<=0||heightMm<=0)return src;
+        Bitmap cropped=cropRatio(src,widthMm,heightMm);
+        return resizeForPrint(cropped,mmToPx(widthMm),mmToPx(heightMm));
+    }
     public static Bitmap adjust(Bitmap src, float brightness, float contrast) {
         Bitmap out=Bitmap.createBitmap(src.getWidth(),src.getHeight(),Bitmap.Config.ARGB_8888);
         float c=contrast; float factor=(259f*(c+255f))/(255f*(259f-c));
