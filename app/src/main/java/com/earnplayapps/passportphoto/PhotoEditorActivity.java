@@ -66,7 +66,7 @@ public class PhotoEditorActivity extends Activity {
         LinearLayout r2=row();add(r2,"Background",v->backgroundDialog());add(r2,"Adjust",v->adjustDialog());add(r2,"Undo",v->undo());add(r2,"Redo",v->redo());root.addView(r2);
         LinearLayout r3=row();add(r3,"Before / After",v->{showingOriginal=!showingOriginal;preview.setImageBitmap(showingOriginal?original:working);});add(r3,"Check Photo",v->check());root.addView(r3);
         Button print=btn("PRINT STUDIO");print.setOnClickListener(v->preparePrint());root.addView(print);
-        LinearLayout r4=row();Button share=btn("Share");share.setOnClickListener(v->export(true));r4.addView(share,new LinearLayout.LayoutParams(0,dp(54),1));Button ex=btn("FINAL VALIDATION & EXPORT");ex.setOnClickListener(v->check());r4.addView(ex,new LinearLayout.LayoutParams(0,dp(54),2));root.addView(r4);
+        LinearLayout r4=row();Button share=btn("Share");share.setOnClickListener(v->checkAndShare());r4.addView(share,new LinearLayout.LayoutParams(0,dp(54),1));Button ex=btn("FINAL VALIDATION & EXPORT");ex.setOnClickListener(v->check());r4.addView(ex,new LinearLayout.LayoutParams(0,dp(54),2));root.addView(r4);
         setContentView(root);
     }
     LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.HORIZONTAL);l.setPadding(0,dp(2),0,dp(2));return l;}
@@ -108,10 +108,12 @@ public class PhotoEditorActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("Adjust").setView(l).setPositiveButton("Apply",(d,w)->{pushUndo();working=PhotoEngine.adjust(working,br.getProgress()-50,co.getProgress()-50);showWorking();}).setNegativeButton("Cancel",null).show();
     }
 
-    void check(){
+    void check(){checkInternal(false);}
+    void checkAndShare(){checkInternal(true);}
+    void checkInternal(boolean shareAfterPass){
         ComplianceEngine.Report r=ComplianceEngine.check(working,req);StringBuilder s=new StringBuilder(r.summary+"\n\n");
         for(ComplianceEngine.Issue i:r.issues)s.append(i.status).append(" • ").append(i.title).append("\n").append(i.detail).append("\n\n");
-        new AlertDialog.Builder(this).setTitle("Compliance Checker").setMessage(s.toString()).setPositiveButton(r.pass?"EXPORT":"OK",(d,w)->{if(r.pass)export(false);}).setNegativeButton("Close",null).show();
+        new AlertDialog.Builder(this).setTitle("Compliance Checker").setMessage(s.toString()).setPositiveButton(r.pass?"EXPORT":"OK",(d,w)->{if(r.pass)export(shareAfterPass);}).setNegativeButton("Close",null).show();
     }
     long parseLimitBytes(String rule){try{String x=rule.toLowerCase().trim().replace(',','.');String num=x.replaceAll("[^0-9.]","");if(num.isEmpty())return-1;double n=Double.parseDouble(num);if(x.contains("mb"))return(long)(n*1024d*1024d);if(x.contains("kb"))return(long)(n*1024d);}catch(Exception ignored){}return-1;}
 
