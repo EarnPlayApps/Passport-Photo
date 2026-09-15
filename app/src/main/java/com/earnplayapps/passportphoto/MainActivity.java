@@ -2,7 +2,7 @@ package com.earnplayapps.passportphoto;
 
 import android.app.*;import android.content.*;import android.graphics.Color;import android.os.Bundle;import android.view.*;import android.widget.*;import java.util.*;
 
-public class MainActivity{
+public class MainActivity extends Activity{
  static final int PICK=1001;String pendingRequirementId="";int dp(int v){return(int)(v*getResources().getDisplayMetrics().density+.5f);}Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setMinHeight(dp(52));return b;}
  @Override public void onCreate(Bundle b){super.onCreate(b);home();}
  TextView title(String s,int z){TextView t=new TextView(this);t.setText(s);t.setTextSize(z);t.setTextColor(Color.rgb(23,35,61));t.setPadding(0,dp(10),0,dp(8));return t;}void base(LinearLayout r){r.setPadding(dp(18),dp(18),dp(18),dp(24));r.setBackgroundColor(Color.rgb(245,247,251));}
