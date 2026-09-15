@@ -51,10 +51,10 @@ public final class PhotoEngine {
         return Bitmap.createScaledBitmap(src, widthPx, heightPx, true);
     }
 
+    /** Resize the already-framed editor result without silently changing its composition. */
     public static Bitmap resizeForPrintMm(Bitmap src, int widthMm, int heightMm) {
         if (widthMm <= 0 || heightMm <= 0) return src;
-        Bitmap cropped = autoCrop(src, widthMm, heightMm);
-        return resizeForPrint(cropped, mmToPx(widthMm), mmToPx(heightMm));
+        return resizeForPrint(src, mmToPx(widthMm), mmToPx(heightMm));
     }
 
     public static Bitmap adjust(Bitmap src, float brightness, float contrast) {
