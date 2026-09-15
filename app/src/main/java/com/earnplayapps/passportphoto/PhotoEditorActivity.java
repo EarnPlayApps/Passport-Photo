@@ -36,7 +36,7 @@ public class PhotoEditorActivity extends Activity {
         reqId=getIntent().getStringExtra("requirement_id");
         try{Uri u=getIntent().getData();if(u!=null)original=decodeUri(u);}catch(Exception ignored){}
         if(original==null){Toast.makeText(this,"Tidak dapat membaca foto",Toast.LENGTH_LONG).show();finish();return;}
-        working=original;
+        working=original.copy(Bitmap.Config.ARGB_8888,false);
         for(Requirement r:MalaysiaRequirements.all())if(r.id.equals(reqId))req=r;
         if(req==null&&getIntent().hasExtra("custom_width_mm")){
             int w=getIntent().getIntExtra("custom_width_mm",0),h=getIntent().getIntExtra("custom_height_mm",0);
@@ -64,8 +64,8 @@ public class PhotoEditorActivity extends Activity {
 
         LinearLayout r1=row();add(r1,"Auto Align",v->transform(1));add(r1,"Crop",v->transform(2));add(r1,"Rotate",v->transform(3));add(r1,"Flip",v->transform(4));root.addView(r1);
         LinearLayout r2=row();add(r2,"Background",v->backgroundDialog());add(r2,"Adjust",v->adjustDialog());add(r2,"Undo",v->undo());add(r2,"Redo",v->redo());root.addView(r2);
-        LinearLayout r3=row();add(r3,"Before / After",v->{showingOriginal=!showingOriginal;preview.setImageBitmap(showingOriginal?original:working);});add(r3,"Check Photo",v->check());root.addView(r3);
-        Button print=btn("PRINT STUDIO");print.setOnClickListener(v->preparePrint());root.addView(print);
+        LinearLayout r3=row();add(r3,"Before / After",v->{showingOriginal=!showingOriginal;preview.setImageBitmap(showingOriginal?original:working);});add(r3,"Reset",v->reset());add(r3,"Check Photo",v->check());root.addView(r3);
+        Button print=btn("PRINT STUDIO");print.setOnClickListener(v->checkAndPrint());root.addView(print);
         LinearLayout r4=row();Button share=btn("Share");share.setOnClickListener(v->checkAndShare());r4.addView(share,new LinearLayout.LayoutParams(0,dp(54),1));Button ex=btn("FINAL VALIDATION & EXPORT");ex.setOnClickListener(v->check());r4.addView(ex,new LinearLayout.LayoutParams(0,dp(54),2));root.addView(r4);
         setContentView(root);
     }
@@ -73,7 +73,7 @@ public class PhotoEditorActivity extends Activity {
     void add(LinearLayout l,String s,android.view.View.OnClickListener c){Button b=btn(s);b.setOnClickListener(c);l.addView(b,new LinearLayout.LayoutParams(0,dp(50),1));}
     void pushUndo(){if(undo.size()>=8)undo.removeLast();undo.push(working);while(!redo.isEmpty())redo.pop();}
     void transform(int type){
-        if(type<=2&& (req==null||req.widthMm<=0)){Toast.makeText(this,"Pilih ukuran rasmi atau Custom Size dahulu.",Toast.LENGTH_SHORT).show();return;}
+        if(type<=2&& (req==null||req.widthMm<=0||req.heightMm<=0)){Toast.makeText(this,"Pilih ukuran rasmi atau Custom Size dahulu.",Toast.LENGTH_SHORT).show();return;}
         pushUndo();
         if(type==1)working=PhotoEngine.autoCrop(working,req.widthMm,req.heightMm);
         else if(type==2)working=PhotoEngine.cropRatio(working,req.widthMm,req.heightMm);
@@ -83,16 +83,23 @@ public class PhotoEditorActivity extends Activity {
     }
     void undo(){if(!undo.isEmpty()){redo.push(working);working=undo.pop();showWorking();}else Toast.makeText(this,"Tiada perubahan untuk di-undo.",Toast.LENGTH_SHORT).show();}
     void redo(){if(!redo.isEmpty()){undo.push(working);working=redo.pop();showWorking();}else Toast.makeText(this,"Tiada perubahan untuk di-redo.",Toast.LENGTH_SHORT).show();}
+    void reset(){while(!undo.isEmpty())undo.pop();while(!redo.isEmpty())redo.pop();working=original.copy(Bitmap.Config.ARGB_8888,false);showWorking();Toast.makeText(this,"Foto dikembalikan ke asal.",Toast.LENGTH_SHORT).show();}
     void showWorking(){showingOriginal=false;preview.setImageBitmap(working);}
 
+    boolean allowedBackground(int index){
+        if(req==null||req.background==null)return index==0;
+        String rule=req.background.toLowerCase(Locale.US);
+        if(rule.contains("tidak dinyatakan")||rule.contains("unspecified")||rule.contains("pilihan pengguna")||rule.contains("custom"))return true;
+        if(index==1)return rule.contains("white")||rule.contains("putih")||rule.contains("white/light");
+        if(index==2)return rule.contains("blue")||rule.contains("biru");
+        if(index==3)return rule.contains("grey")||rule.contains("gray")||rule.contains("kelabu");
+        return false;
+    }
     void backgroundDialog(){
         String[] opts={"Keep original","White","Blue","Light grey"};
         new AlertDialog.Builder(this).setTitle("Background").setItems(opts,(d,w)->{
             if(w==0)return;
-            String rule=req==null?"":req.background==null?"":req.background.toLowerCase(Locale.US);
-            if(!rule.contains("tidak dinyatakan")&&!rule.contains("unspecified")&&!rule.contains("white")&&!rule.contains("putih")&&!rule.contains("blue")&&!rule.contains("biru")&&!rule.contains("grey")&&!rule.contains("kelabu")){
-                Toast.makeText(this,"Pilihan background mesti ikut requirement rasmi.",Toast.LENGTH_LONG).show();return;
-            }
+            if(!allowedBackground(w)){Toast.makeText(this,"Pilihan background tidak dibenarkan oleh requirement terpilih.",Toast.LENGTH_LONG).show();return;}
             pushUndo();int c=w==1?Color.WHITE:w==2?Color.rgb(30,95,190):Color.rgb(235,235,235);working=replaceBackground(working,c);showWorking();
         }).show();
     }
@@ -110,10 +117,22 @@ public class PhotoEditorActivity extends Activity {
 
     void check(){checkInternal(false);}
     void checkAndShare(){checkInternal(true);}
-    void checkInternal(boolean shareAfterPass){
-        ComplianceEngine.Report r=ComplianceEngine.check(working,req);StringBuilder s=new StringBuilder(r.summary+"\n\n");
+    void checkAndPrint(){
+        ComplianceEngine.Report r=ComplianceEngine.check(working,req);
+        if(!r.pass){showReport(r,false);return;}
+        showReport(r,true);
+    }
+    void showReport(ComplianceEngine.Report r,boolean printAfterPass){
+        StringBuilder s=new StringBuilder(r.summary+"\n\n");
         for(ComplianceEngine.Issue i:r.issues)s.append(i.status).append(" • ").append(i.title).append("\n").append(i.detail).append("\n\n");
-        new AlertDialog.Builder(this).setTitle("Compliance Checker").setMessage(s.toString()).setPositiveButton(r.pass?"EXPORT":"OK",(d,w)->{if(r.pass)export(shareAfterPass);}).setNegativeButton("Close",null).show();
+        String positive=printAfterPass?"OPEN PRINT STUDIO":(r.pass?"EXPORT":"OK");
+        new AlertDialog.Builder(this).setTitle("Compliance Checker").setMessage(s.toString()).setPositiveButton(positive,(d,w)->{if(r.pass){if(printAfterPass)preparePrint();else export(false);}}).setNegativeButton("Close",null).show();
+    }
+    void checkInternal(boolean shareAfterPass){
+        ComplianceEngine.Report r=ComplianceEngine.check(working,req);showReport(r,shareAfterPass);
+        if(shareAfterPass&&r.pass){
+            // The dialog action above handles export/share; keep this branch only as a semantic guard.
+        }
     }
     long parseLimitBytes(String rule){try{String x=rule.toLowerCase().trim().replace(',','.');String num=x.replaceAll("[^0-9.]","");if(num.isEmpty())return-1;double n=Double.parseDouble(num);if(x.contains("mb"))return(long)(n*1024d*1024d);if(x.contains("kb"))return(long)(n*1024d);}catch(Exception ignored){}return-1;}
 
