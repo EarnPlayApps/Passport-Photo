@@ -1,43 +1,18 @@
 package com.earnplayapps.passportphoto;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
-import android.net.Uri;
-import android.os.Bundle;
-import android.provider.MediaStore;
-import android.view.Gravity;
-import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
-import java.io.File;
-import java.io.FileOutputStream;
+import android.app.*;import android.content.*;import android.graphics.*;import android.net.Uri;import android.os.*;import android.provider.MediaStore;import android.view.*;import android.widget.*;import java.io.*;import java.util.*;
 
-public class PhotoEditorActivity extends android.app.Activity {
-    private Bitmap original;
-    private ImageView preview;
-    private int widthMm=35, heightMm=50;
-    private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}
-    private Button button(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setMinHeight(dp(50));b.setLayoutParams(new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));return b;}
-    @Override public void onCreate(Bundle b){super.onCreate(b); Uri uri=getIntent().getData();
-        if(uri==null){finish();return;}
-        try{original=MediaStore.Images.Media.getBitmap(getContentResolver(),uri);}catch(Exception e){Toast.makeText(this,"Tidak dapat membaca foto",Toast.LENGTH_LONG).show();finish();return;}
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(16),dp(18),dp(16),dp(16));root.setBackgroundColor(0xFFF5F7FB);
-        TextView title=new TextView(this);title.setText("Photo Editor");title.setTextSize(24);title.setTextColor(0xFF17233D);root.addView(title);
-        TextView info=new TextView(this);info.setText("Malaysia requirement: "+widthMm+" x "+heightMm+" mm\nOriginal preserved locally");info.setTextColor(0xFF5B6475);root.addView(info);
-        preview=new ImageView(this);preview.setScaleType(ImageView.ScaleType.FIT_CENTER);preview.setBackgroundColor(0xFFE4E8EF);preview.setImageBitmap(original);root.addView(preview,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
-        Button rotate=button("Rotate");rotate.setOnClickListener(v->rotate());row.addView(rotate);
-        Button crop=button("Auto Crop");crop.setOnClickListener(v->crop());row.addView(crop);
-        Button reset=button("Reset");reset.setOnClickListener(v->{preview.setImageBitmap(original);});row.addView(reset);root.addView(row);
-        Button export=new Button(this);export.setText("CHECK & EXPORT JPG");export.setOnClickListener(v->export());root.addView(export,new LinearLayout.LayoutParams(-1,dp(54)));
-        setContentView(root);
-    }
-    private void rotate(){Matrix m=new Matrix();m.postRotate(90);original=Bitmap.createBitmap(original,0,0,original.getWidth(),original.getHeight(),m,true);preview.setImageBitmap(original);}
-    private void crop(){int w=original.getWidth(),h=original.getHeight();float target=(float)widthMm/heightMm;int nw=w,nh=(int)(w/target);if(nh>h){nh=h;nw=(int)(h*target);}int l=(w-nw)/2,t=(h-nh)/2;Bitmap c=Bitmap.createBitmap(original,l,t,nw,nh);preview.setImageBitmap(c);original=c;}
-    private void export(){try{File dir=new File(getExternalFilesDir(null),"Passport Photo");if(!dir.exists())dir.mkdirs();File out=new File(dir,"passport_photo_"+System.currentTimeMillis()+".jpg");FileOutputStream fos=new FileOutputStream(out);preview.getDrawable();Bitmap b=BitmapFactory.decodeResource(getResources(),android.R.drawable.ic_menu_gallery); // replaced below
-            Bitmap shown=original;shown.compress(Bitmap.CompressFormat.JPEG,95,fos);fos.close();Toast.makeText(this,"Foto disimpan: "+out.getName(),Toast.LENGTH_LONG).show();}catch(Exception e){Toast.makeText(this,"Export gagal",Toast.LENGTH_LONG).show();}}
+public class PhotoEditorActivity extends Activity{
+ Bitmap original,working;ImageView preview;Requirement req;String reqId;float bright=0,contrast=0;
+ int dp(int v){return(int)(v*getResources().getDisplayMetrics().density+.5f);} Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setMinHeight(dp(48));return b;}
+ @Override public void onCreate(Bundle b){super.onCreate(b);reqId=getIntent().getStringExtra("requirement_id");Object camera=getIntent().getParcelableExtra("camera_bitmap");try{if(camera instanceof Bitmap)original=(Bitmap)camera;else{Uri u=getIntent().getData();if(u!=null)original=MediaStore.Images.Media.getBitmap(getContentResolver(),u);}}catch(Exception e){}if(original==null){Toast.makeText(this,"Tidak dapat membaca foto",Toast.LENGTH_LONG).show();finish();return;}working=original;for(Requirement r:MalaysiaRequirements.all())if(r.id.equals(reqId))req=r;build();}
+ void build(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(12),dp(12),dp(12),dp(12));root.setBackgroundColor(0xfff5f7fb);TextView t=new TextView(this);t.setText("Passport Photo • Editor");t.setTextSize(24);t.setTextColor(0xff17233d);root.addView(t);TextView info=new TextView(this);info.setText(req==null?"Custom Photo Builder":req.purpose+"\n"+req.size+" • "+req.background+"\nOfficial evidence: "+req.evidence);info.setTextColor(0xff5b6475);root.addView(info);preview=new ImageView(this);preview.setScaleType(ImageView.ScaleType.FIT_CENTER);preview.setBackgroundColor(0xffe4e8ef);preview.setImageBitmap(working);root.addView(preview,new LinearLayout.LayoutParams(-1,0,1));
+ LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);Button rot=btn("Rotate");rot.setOnClickListener(v->{working=PhotoEngine.rotate(working,90);preview.setImageBitmap(working);});row.addView(rot,new LinearLayout.LayoutParams(0,dp(48),1));Button crop=btn("Crop");crop.setOnClickListener(v->{if(req!=null&&req.widthMm>0)working=PhotoEngine.cropRatio(working,req.widthMm,req.heightMm);preview.setImageBitmap(working);});row.addView(crop,new LinearLayout.LayoutParams(0,dp(48),1));Button reset=btn("Reset");reset.setOnClickListener(v->{working=original;preview.setImageBitmap(working);});row.addView(reset,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(row);
+ LinearLayout row2=new LinearLayout(this);Button bg=btn("Background");bg.setOnClickListener(v->backgroundDialog());row2.addView(bg,new LinearLayout.LayoutParams(0,dp(48),1));Button adj=btn("Adjust");adj.setOnClickListener(v->adjustDialog());row2.addView(adj,new LinearLayout.LayoutParams(0,dp(48),1));Button check=btn("Check Photo");check.setOnClickListener(v->check());row2.addView(check,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(row2);
+ Button print=btn("Print Studio");print.setOnClickListener(v->{Intent i=new Intent(this,PrintStudioActivity.class);i.putExtra("bitmap",working);startActivity(i);});root.addView(print);Button ex=btn("FINAL VALIDATION & EXPORT");ex.setOnClickListener(v->check());root.addView(ex,new LinearLayout.LayoutParams(-1,dp(54)));setContentView(root);}
+ void backgroundDialog(){String[] opts={"Keep original","White","Blue","Light grey"};new AlertDialog.Builder(this).setTitle("Background").setItems(opts,(d,w)->{if(w==0)return;int c=w==1?Color.WHITE:w==2?Color.rgb(30,95,190):Color.rgb(235,235,235);working=replaceBackground(working,c);preview.setImageBitmap(working);}).show();}
+ Bitmap replaceBackground(Bitmap src,int color){Bitmap out=src.copy(Bitmap.Config.ARGB_8888,true);int cw=src.getPixel(0,0),tol=45;for(int y=0;y<src.getHeight();y++)for(int x=0;x<src.getWidth();x++){int p=src.getPixel(x,y);int d=Math.abs(Color.red(p)-Color.red(cw))+Math.abs(Color.green(p)-Color.green(cw))+Math.abs(Color.blue(p)-Color.blue(cw));if(d<tol)out.setPixel(x,y,color);}return out;}
+ void adjustDialog(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);SeekBar b=new SeekBar(this);b.setMax(100);b.setProgress(50);SeekBar c=new SeekBar(this);c.setMax(100);c.setProgress(50);l.addView(new TextView(this){{setText("Brightness");}});l.addView(b);l.addView(new TextView(this){{setText("Contrast");}});l.addView(c);new AlertDialog.Builder(this).setTitle("Adjust").setView(l).setPositiveButton("Apply",(d,w)->{working=PhotoEngine.adjust(working,b.getProgress()-50,c.getProgress()-50);preview.setImageBitmap(working);}).setNegativeButton("Cancel",null).show();}
+ void check(){if(req==null){new AlertDialog.Builder(this).setTitle("Custom Photo").setMessage("Custom mode has no official PASS/FAIL standard. Set the exact dimensions and rules required by your form before exporting.").setPositiveButton("OK",null).show();return;}ComplianceEngine.Report r=ComplianceEngine.check(working,req);StringBuilder s=new StringBuilder(r.summary+"\n\n");for(ComplianceEngine.Issue i:r.issues)s.append(i.status).append(" • ").append(i.title).append("\n").append(i.detail).append("\n\n");new AlertDialog.Builder(this).setTitle("Compliance Checker").setMessage(s.toString()).setPositiveButton(r.pass?"EXPORT":"FIX",(d,w)->{if(r.pass)export();}).setNegativeButton("Close",null).show();}
+ void export(){try{byte[] data=PhotoEngine.jpeg(working,95);if(req!=null&&req.maxFileSize!=null&&!req.maxFileSize.equalsIgnoreCase("Tidak dinyatakan")){int kb=Integer.parseInt(req.maxFileSize.replaceAll("[^0-9]",""));if(data.length>kb*1024){Toast.makeText(this,"Fail: file exceeds "+kb+" KB. Lower quality/compress further.",Toast.LENGTH_LONG).show();return;}}String name="PassportPhoto_"+System.currentTimeMillis()+".jpg";android.content.ContentValues v=new android.content.ContentValues();v.put(MediaStore.Images.Media.DISPLAY_NAME,name);v.put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg");v.put(MediaStore.Images.Media.RELATIVE_PATH,"Pictures/Passport Photo");Uri u=getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,v);OutputStream o=getContentResolver().openOutputStream(u);o.write(data);o.close();ProjectStore.add(this,name);Toast.makeText(this,"Export berjaya: "+name,Toast.LENGTH_LONG).show();}catch(Exception e){Toast.makeText(this,"Export gagal: "+e.getMessage(),Toast.LENGTH_LONG).show();}}
 }
