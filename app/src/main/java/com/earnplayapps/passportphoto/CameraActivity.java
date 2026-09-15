@@ -1,61 +1,12 @@
 package com.earnplayapps.passportphoto;
 
-import android.app.Activity;
-import android.content.*;
-import android.content.pm.PackageManager;
-import android.net.Uri;
-import android.os.Bundle;
-import android.provider.MediaStore;
-import android.Manifest;
+import android.app.Activity;import android.app.AlertDialog;import android.content.*;import android.content.pm.PackageManager;import android.net.Uri;import android.os.Bundle;import android.provider.MediaStore;import android.Manifest;
 
 public class CameraActivity extends Activity {
-    static final int CAM = 10, PERM = 11;
-    private Uri outputUri;
-
-    @Override public void onCreate(Bundle b) {
-        super.onCreate(b);
-        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.CAMERA}, PERM);
-        } else open();
-    }
-
-    private void open() {
-        try {
-            ContentValues v = new ContentValues();
-            v.put(MediaStore.Images.Media.DISPLAY_NAME, "PassportPhoto_Camera_" + System.currentTimeMillis() + ".jpg");
-            v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-            if (android.os.Build.VERSION.SDK_INT >= 29) v.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Passport Photo");
-            outputUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
-            if (outputUri == null) throw new IllegalStateException("Camera output unavailable");
-
-            Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            i.putExtra(MediaStore.EXTRA_OUTPUT, outputUri);
-            i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivityForResult(i, CAM);
-        } catch (Exception e) {
-            if (outputUri != null) getContentResolver().delete(outputUri, null, null);
-            outputUri = null;
-            setResult(RESULT_CANCELED);
-            finish();
-        }
-    }
-
-    @Override public void onRequestPermissionsResult(int r, String[] p, int[] g) {
-        super.onRequestPermissionsResult(r, p, g);
-        if (r == PERM && g.length > 0 && g[0] == PackageManager.PERMISSION_GRANTED) open();
-        else finish();
-    }
-
-    @Override protected void onActivityResult(int r, int c, Intent d) {
-        super.onActivityResult(r, c, d);
-        if (r == CAM && c == RESULT_OK && outputUri != null) {
-            Intent i = new Intent(this, PhotoEditorActivity.class);
-            i.setData(outputUri);
-            startActivity(i);
-            setResult(RESULT_OK);
-        } else if (outputUri != null) {
-            getContentResolver().delete(outputUri, null, null);
-        }
-        finish();
-    }
+    static final int CAM=10,PERM=11;private Uri outputUri;
+    @Override public void onCreate(Bundle b){super.onCreate(b);if(android.os.Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.CAMERA},PERM);}else guide();}
+    private void guide(){new AlertDialog.Builder(this).setTitle("Camera Guide").setMessage("Before taking the photo:\n\n• Face the camera directly\n• Keep eyes open and mouth closed\n• Keep hair from covering the face\n• Avoid strong shadows and uneven lighting\n• Keep the face centred\n• Use the highest-quality camera available\n\nFinal requirements depend on the selected Malaysian document.").setPositiveButton("OPEN CAMERA",(d,w)->open()).setNegativeButton("Cancel",(d,w)->finish()).setOnCancelListener(d->finish()).show();}
+    private void open(){try{ContentValues v=new ContentValues();v.put(MediaStore.Images.Media.DISPLAY_NAME,"PassportPhoto_Camera_"+System.currentTimeMillis()+".jpg");v.put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg");if(android.os.Build.VERSION.SDK_INT>=29)v.put(MediaStore.Images.Media.RELATIVE_PATH,"Pictures/Passport Photo");outputUri=getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,v);if(outputUri==null)throw new IllegalStateException("Camera output unavailable");Intent i=new Intent(MediaStore.ACTION_IMAGE_CAPTURE);i.putExtra(MediaStore.EXTRA_OUTPUT,outputUri);i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivityForResult(i,CAM);}catch(Exception e){if(outputUri!=null)getContentResolver().delete(outputUri,null,null);outputUri=null;setResult(RESULT_CANCELED);finish();}}
+    @Override public void onRequestPermissionsResult(int r,String[] p,int[] g){super.onRequestPermissionsResult(r,p,g);if(r==PERM&&g.length>0&&g[0]==PackageManager.PERMISSION_GRANTED)guide();else finish();}
+    @Override protected void onActivityResult(int r,int c,Intent d){super.onActivityResult(r,c,d);if(r==CAM&&c==RESULT_OK&&outputUri!=null){Intent i=new Intent(this,PhotoEditorActivity.class);i.setData(outputUri);startActivity(i);setResult(RESULT_OK);}else if(outputUri!=null)getContentResolver().delete(outputUri,null,null);finish();}
 }
