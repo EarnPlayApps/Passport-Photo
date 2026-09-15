@@ -30,8 +30,19 @@ jobs:
         run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
-      - name: Upload APK
+      - name: Build release APK (unsigned)
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Validate APK package metadata
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | head -n 5
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: passport-photo-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload release APK (unsigned)
+        uses: actions/upload-artifact@v4
+        with:
+          name: passport-photo-release-unsigned-apk
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
