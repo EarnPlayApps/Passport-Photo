@@ -5,6 +5,15 @@
         android:label="Passport Photo"
         android:allowBackup="false"
         android:supportsRtl="true">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
         <activity android:name=".PaymentActivity" android:screenOrientation="portrait" android:exported="false" />
         <activity android:name=".BatchActivity" android:screenOrientation="portrait" android:exported="false" />
         <activity android:name=".PrintStudioActivity" android:screenOrientation="portrait" android:exported="false" />
