@@ -29,6 +29,7 @@ public final class ComplianceEngine {
    float cx=f.midX/Math.max(1f,b.getWidth()),cy=f.midY/Math.max(1f,b.getHeight());
    if(cx<.20f||cx>.80f)o.add(new Issue("Horizontal position","Face is far from centre. Use Auto Align or Crop.","WARNING"));else o.add(new Issue("Horizontal position","Face is near the horizontal centre.","PASS"));
    if(cy<.10f||cy>.85f)o.add(new Issue("Vertical position","Face is near an image edge. Check headroom and chin margin.","WARNING"));else o.add(new Issue("Vertical position","Face position is within the usable image area.","PASS"));
+   addMeasuredFaceRules(o,b,r,f);
   }
   if(r.widthMm>0&&r.heightMm>0){
    float rr=(float)r.widthMm/r.heightMm,ar=(float)b.getWidth()/Math.max(1,b.getHeight());
@@ -48,6 +49,21 @@ public final class ComplianceEngine {
   if(r.faceRules!=null&&!r.faceRules.trim().isEmpty())o.add(new Issue("Official face rules",r.faceRules,"INFO"));
   return new Report(o);
  }
+ /** Uses the available local face geometry to estimate physical head/margin values. These are advisory because legacy Android FaceDetector does not expose a true chin/crown landmark. */
+ private static void addMeasuredFaceRules(List<Issue> o,Bitmap b,Requirement r,FaceAnalyzer.Result f){
+  if(r.widthMm<=0||r.heightMm<=0||f.eyeDistance<=0)return;
+  float mmPerPx=r.heightMm/(float)Math.max(1,b.getHeight());
+  float estimatedHeadPx=f.eyeDistance*2.4f;
+  float headMm=estimatedHeadPx*mmPerPx;
+  float crownMm=(f.midY-f.eyeDistance*1.15f)*mmPerPx;
+  float chinMm=(f.midY+f.eyeDistance*1.25f)*mmPerPx;
+  float top=Math.max(0,crownMm), chin=Math.max(0,r.heightMm-chinMm);
+  if(r.headHeightMinMm>0||r.headHeightMaxMm>0)o.add(rangeIssue("Estimated head height",headMm,r.headHeightMinMm,r.headHeightMaxMm,"mm","WARNING"));
+  if(r.topMarginMinMm>0||r.topMarginMaxMm>0)o.add(rangeIssue("Estimated top margin",top,r.topMarginMinMm,r.topMarginMaxMm,"mm","WARNING"));
+  if(r.chinMarginMinMm>0||r.chinMarginMaxMm>0)o.add(rangeIssue("Estimated chin margin",chin,r.chinMarginMinMm,r.chinMarginMaxMm,"mm","WARNING"));
+  if(r.faceSizeMinMm>0||r.faceSizeMaxMm>0)o.add(rangeIssue("Estimated face size",headMm,r.faceSizeMinMm,r.faceSizeMaxMm,"mm","WARNING"));
+ }
+ private static void rangeIssue(List<Issue> o,String name,float value,float min,float max,String unit,String status){boolean low=min>0&&value<min,high=max>0&&value>max;String range=(min>0?String.format(Locale.US,"%.1f",min):"open")+"–"+(max>0?String.format(Locale.US,"%.1f",max):"open")+" "+unit;String detail=String.format(Locale.US,"Anggaran %s: %.1f %s; julat sumber: %s. FaceDetector lama tidak mempunyai landmark crown/chin sebenar, jadi semak visual sebelum hantar.",name,value,unit,range);o.add(new Issue(name,detail,(low||high)?status:"INFO"));}
  private static void validateFinalFile(List<Issue> o,Bitmap b,Requirement r){
   if(r.widthMm<=0||r.heightMm<=0)return;
   try{
