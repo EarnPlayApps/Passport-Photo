@@ -43,11 +43,34 @@ public final class ComplianceEngine {
   else o.add(new Issue("Background","Required background: "+r.background+". Automated sampling cannot prove official compliance; verify visually.","INFO"));
   long pixels=(long)b.getWidth()*b.getHeight();if(b.getWidth()<600||b.getHeight()<600||pixels<360000L)o.add(new Issue("Resolution","Source image is relatively small. Use the highest-quality original available.","WARNING"));else o.add(new Issue("Resolution","Source resolution is adequate for editing.","PASS"));
   double lum=averageLuminance(b);if(lum<55)o.add(new Issue("Lighting","Image appears very dark. Improve lighting.","WARNING"));else if(lum>225)o.add(new Issue("Lighting","Image appears very bright/washed out. Check exposure.","WARNING"));else o.add(new Issue("Lighting","Overall exposure is within a usable range.","PASS"));
+  validateFinalFile(o,b,r);
   if(r.format!=null&&!r.format.trim().isEmpty()&&!r.format.toLowerCase(Locale.US).contains("tidak dinyatakan"))o.add(new Issue("File format","Required output format: "+r.format+". Final export applies the permitted format.","INFO"));
-  if(r.maxFileSize!=null&&!r.maxFileSize.trim().isEmpty()&&!r.maxFileSize.toLowerCase(Locale.US).contains("tidak dinyatakan"))o.add(new Issue("File size","Documented file-size rule: "+r.maxFileSize+". Final export should validate the encoded file.","INFO"));
   if(r.faceRules!=null&&!r.faceRules.trim().isEmpty())o.add(new Issue("Official face rules",r.faceRules,"INFO"));
   return new Report(o);
  }
+ private static void validateFinalFile(List<Issue> o,Bitmap b,Requirement r){
+  if(r.widthMm<=0||r.heightMm<=0)return;
+  try{
+   Bitmap out=PhotoEngine.resizeForPrintMm(b,r.widthMm,r.heightMm);
+   String fmt=r.format==null?"":r.format.toLowerCase(Locale.US);
+   String rule=r.maxFileSize==null?"":r.maxFileSize.toLowerCase(Locale.US).trim();
+   long limit=parseLimitBytes(rule);
+   if(limit>0 && fmt.contains("jpg") && !fmt.contains("png")){
+    if(rule.contains("minimum")){
+     byte[] data=PhotoEngine.jpeg(out,100);
+     if(data.length<limit)o.add(new Issue("Final file size","At final output size, JPEG is only "+formatBytes(data.length)+"; official minimum is "+formatBytes(limit)+".","FAIL"));
+     else o.add(new Issue("Final file size","Final JPEG can meet the official minimum: about "+formatBytes(data.length)+" at quality 100.","PASS"));
+    }else{
+     int chosen=-1;long bytes=-1;
+     for(int q=95;q>=30;q-=5){byte[] data=PhotoEngine.jpeg(out,q);if(data.length<=limit){chosen=q;bytes=data.length;break;}}
+     if(chosen<0)o.add(new Issue("Final file size","No tested JPEG quality from 95 down to 30 can meet the official maximum of "+formatBytes(limit)+".","FAIL"));
+     else o.add(new Issue("Final file size","Final JPEG can meet the official maximum: about "+formatBytes(bytes)+" at quality "+chosen+".","PASS"));
+    }
+   }else if(limit>0)o.add(new Issue("Final file size","Final file-size rule is "+r.maxFileSize+"; automatic byte validation is limited for this output format.","INFO"));
+  }catch(Exception e){o.add(new Issue("Final output validation","Could not simulate final output: "+e.getMessage(),"WARNING"));}
+ }
+ private static long parseLimitBytes(String rule){try{String x=rule.replace(',','.');String num=x.replaceAll("[^0-9.]","");if(num.isEmpty())return-1;double n=Double.parseDouble(num);if(x.contains("mb"))return(long)(n*1024d*1024d);if(x.contains("kb"))return(long)(n*1024d);}catch(Exception ignored){}return-1;}
+ private static String formatBytes(long n){if(n>=1024*1024)return String.format(Locale.US,"%.2f MB",n/1048576d);return String.format(Locale.US,"%.1f KB",n/1024d);}
  private static double averageLuminance(Bitmap b){int step=Math.max(1,Math.max(b.getWidth(),b.getHeight())/80);long total=0,count=0;for(int y=0;y<b.getHeight();y+=step)for(int x=0;x<b.getWidth();x+=step){int p=b.getPixel(x,y);total+=(299*Color.red(p)+587*Color.green(p)+114*Color.blue(p))/1000;count++;}return count==0?128:total/(double)count;}
  public static boolean hasBlockingIssues(Report r){if(r==null)return true;for(Issue i:r.issues)if("FAIL".equals(i.status))return true;return false;}
 }
