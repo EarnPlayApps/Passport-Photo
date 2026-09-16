@@ -49,21 +49,21 @@ public final class ComplianceEngine {
   if(r.faceRules!=null&&!r.faceRules.trim().isEmpty())o.add(new Issue("Official face rules",r.faceRules,"INFO"));
   return new Report(o);
  }
- /** Uses the available local face geometry to estimate physical head/margin values. These are advisory because legacy Android FaceDetector does not expose a true chin/crown landmark. */
+ /** Estimates official face/margin measurements using local geometry. Results are WARNING/INFO because legacy FaceDetector has no true crown/chin landmark. */
  private static void addMeasuredFaceRules(List<Issue> o,Bitmap b,Requirement r,FaceAnalyzer.Result f){
   if(r.widthMm<=0||r.heightMm<=0||f.eyeDistance<=0)return;
+  RequirementRules.Rules q=RequirementRules.forRequirement(r);if(!q.any())return;
   float mmPerPx=r.heightMm/(float)Math.max(1,b.getHeight());
-  float estimatedHeadPx=f.eyeDistance*2.4f;
-  float headMm=estimatedHeadPx*mmPerPx;
-  float crownMm=(f.midY-f.eyeDistance*1.15f)*mmPerPx;
-  float chinMm=(f.midY+f.eyeDistance*1.25f)*mmPerPx;
-  float top=Math.max(0,crownMm), chin=Math.max(0,r.heightMm-chinMm);
-  if(r.headHeightMinMm>0||r.headHeightMaxMm>0)o.add(rangeIssue("Estimated head height",headMm,r.headHeightMinMm,r.headHeightMaxMm,"mm","WARNING"));
-  if(r.topMarginMinMm>0||r.topMarginMaxMm>0)o.add(rangeIssue("Estimated top margin",top,r.topMarginMinMm,r.topMarginMaxMm,"mm","WARNING"));
-  if(r.chinMarginMinMm>0||r.chinMarginMaxMm>0)o.add(rangeIssue("Estimated chin margin",chin,r.chinMarginMinMm,r.chinMarginMaxMm,"mm","WARNING"));
-  if(r.faceSizeMinMm>0||r.faceSizeMaxMm>0)o.add(rangeIssue("Estimated face size",headMm,r.faceSizeMinMm,r.faceSizeMaxMm,"mm","WARNING"));
+  float estimatedHeadMm=f.eyeDistance*2.4f*mmPerPx;
+  float crown=(f.midY-f.eyeDistance*1.15f)*mmPerPx;
+  float chin=(f.midY+f.eyeDistance*1.25f)*mmPerPx;
+  float topMm=Math.max(0,crown),chinMm=Math.max(0,r.heightMm-chin);
+  if(q.headMin>0||q.headMax>0)addRange(o,"Estimated head height",estimatedHeadMm,q.headMin,q.headMax);
+  if(q.topMin>0||q.topMax>0)addRange(o,"Estimated top margin",topMm,q.topMin,q.topMax);
+  if(q.chinMin>0||q.chinMax>0)addRange(o,"Estimated chin margin",chinMm,q.chinMin,q.chinMax);
+  if(q.faceMin>0||q.faceMax>0)addRange(o,"Estimated face size",estimatedHeadMm,q.faceMin,q.faceMax);
  }
- private static void rangeIssue(List<Issue> o,String name,float value,float min,float max,String unit,String status){boolean low=min>0&&value<min,high=max>0&&value>max;String range=(min>0?String.format(Locale.US,"%.1f",min):"open")+"–"+(max>0?String.format(Locale.US,"%.1f",max):"open")+" "+unit;String detail=String.format(Locale.US,"Anggaran %s: %.1f %s; julat sumber: %s. FaceDetector lama tidak mempunyai landmark crown/chin sebenar, jadi semak visual sebelum hantar.",name,value,unit,range);o.add(new Issue(name,detail,(low||high)?status:"INFO"));}
+ private static void addRange(List<Issue> o,String name,float value,float min,float max){boolean low=min>0&&value<min,high=max>0&&value>max;String range=(min>0?String.format(Locale.US,"%.1f",min):"open")+"–"+(max>0?String.format(Locale.US,"%.1f",max):"open")+" mm";String detail=String.format(Locale.US,"Anggaran %s: %.1f mm; julat rasmi: %s. Semakan ini membantu framing tetapi bukan pengukuran biometrik tepat.",name,value,range);o.add(new Issue(name,detail,(low||high)?"WARNING":"INFO"));}
  private static void validateFinalFile(List<Issue> o,Bitmap b,Requirement r){
   if(r.widthMm<=0||r.heightMm<=0)return;
   try{
@@ -83,7 +83,7 @@ public final class ComplianceEngine {
      else o.add(new Issue("Final file size","Final JPEG can meet the official maximum: about "+formatBytes(bytes)+" at quality "+chosen+".","PASS"));
     }
    }else if(limit>0)o.add(new Issue("Final file size","Final file-size rule is "+r.maxFileSize+"; automatic byte validation is limited for this output format.","INFO"));
-  }catch(Exception e){o.add(new Issue("Final output validation","Could not simulate final output: "+e.getMessage(),"WARNING"));}
+  }catch(Exception e){o.add(new Issue("Final output validation","Could not simulate final output: "+e.getMessage(),"WARNING");}
  }
  private static long parseLimitBytes(String rule){try{String x=rule.replace(',','.');String num=x.replaceAll("[^0-9.]","");if(num.isEmpty())return-1;double n=Double.parseDouble(num);if(x.contains("mb"))return(long)(n*1024d*1024d);if(x.contains("kb"))return(long)(n*1024d);}catch(Exception ignored){}return-1;}
  private static String formatBytes(long n){if(n>=1024*1024)return String.format(Locale.US,"%.2f MB",n/1048576d);return String.format(Locale.US,"%.1f KB",n/1024d);}
