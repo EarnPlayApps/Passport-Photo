@@ -36,6 +36,13 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | head -n 5
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Validate required app components
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          test -f app/build/outputs/apk/release/app-release-unsigned.apk
+          grep -q 'Passport Photo' app/src/main/AndroidManifest.xml
+          grep -q 'workflow_dispatch' .github/workflows/android.yml
+          grep -q 'android:exported="true"' app/src/main/AndroidManifest.xml
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
